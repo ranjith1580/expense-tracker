@@ -735,14 +735,18 @@ body {
     <div class="setup-title">Personal Budget</div>
     <div class="setup-sub">Connect your Google Sheet to get started. Your data never leaves your device.</div>
     <div class="setup-card">
-      <div class="setup-label">Google Apps Script URL</div>
+      <div class="setup-label">Account</div>
+      <input id="gas-user-input" class="setup-input" type="text"
+        placeholder="budget"
+        autocomplete="username"
+        autocorrect="off" autocapitalize="none" spellcheck="false"
+        style="margin-bottom:10px"
+        value="budget"/>
+      <div class="setup-label" style="margin-top:4px">GAS URL (saved as Password)</div>
       <input id="gas-url-input" class="setup-input" type="password"
         placeholder="Paste your GAS Web App URL"
         autocomplete="current-password"
         autocorrect="off" autocapitalize="none" spellcheck="false"/>
-      <div style="font-size:12px;color:var(--t2);margin-top:8px">
-        Save your GAS URL as a password in iPhone Passwords app with username "budget" — iOS will autofill it here.
-      </div>
     </div>
     <button class="btn-primary" id="connect-btn" onclick="connectGAS()">Connect & Test</button>
     <div class="setup-error" id="setup-error"></div>
