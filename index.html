@@ -538,9 +538,25 @@ body{
     </svg>
   </div>
   <div class="lock-title">Personal Budget</div>
-  <div class="pin-dots" id="lock-dots"></div>
-  <div class="pin-grid" id="pin-grid"></div>
-  <button class="faceid-btn" id="faceid-btn" onclick="triggerFaceID()">Use Face ID</button>
+  <!-- Face ID default view -->
+  <div id="faceid-view" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="1.5" stroke-linecap="round">
+        <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01"/>
+      </svg>
+    </div>
+    <div style="color:rgba(255,255,255,0.6);font-size:15px">Face ID</div>
+    <button class="faceid-btn" id="faceid-btn" onclick="triggerFaceID()" style="margin-top:0">Try Again</button>
+    <button class="faceid-btn" onclick="showPinPad()" style="color:rgba(255,255,255,0.4);font-size:13px;margin-top:0">Use PIN instead</button>
+  </div>
+  <!-- PIN pad — hidden by default -->
+  <div id="pinpad-view" style="display:none;flex-direction:column;align-items:center">
+    <div class="pin-dots" id="lock-dots"></div>
+    <div class="pin-grid" id="pin-grid"></div>
+    <button class="faceid-btn" id="faceid-switch-btn" onclick="showFaceIDView()" style="color:rgba(255,255,255,0.4);font-size:13px;margin-top:8px">Use Face ID</button>
+  </div>
   <div class="lock-error" id="lock-error"></div>
   <div class="lock-lockout" id="lock-lockout"></div>
 </div>
@@ -673,6 +689,15 @@ body{
     <input id="f-desc" class="field-input" type="text" placeholder="e.g. Car Loan"/>
     <div class="field-label">Amount (₹)</div>
     <input id="f-amount" class="field-input" type="number" placeholder="0" inputmode="decimal"/>
+    <div class="field-label">Category</div>
+    <select id="f-category" class="field-select" style="margin-bottom:14px">
+      <option value="Expense">Expense</option>
+      <option value="Investment">Investment</option>
+      <option value="EMI/Fixed">EMI / Fixed</option>
+      <option value="Housing">Housing</option>
+      <option value="Personal">Personal</option>
+      <option value="Transfer">Transfer</option>
+    </select>
     <div class="field-label">Status</div>
     <select id="f-status" class="field-select">
       <option value="Not Paid">Not Paid</option>
@@ -706,10 +731,27 @@ body{
 // ══════════════════════════════════════════════════════════
 // HAPTIC
 // ══════════════════════════════════════════════════════════
+// Haptic — Android: vibrate API, iOS: AudioContext click + CSS bounce
+let _audioCtx=null;
 function haptic(type){
-  if(!navigator.vibrate)return;
-  const p={light:[10],medium:[20],heavy:[30],success:[10,50,10],error:[50,30,50],tab:[5]};
-  navigator.vibrate(p[type]||[10]);
+  // Android vibrate
+  if(navigator.vibrate){
+    const p={light:[10],medium:[20],heavy:[30],success:[10,50,10],error:[50,30,50],tab:[5]};
+    navigator.vibrate(p[type]||[10]);
+  }
+  // iOS AudioContext haptic simulation
+  try{
+    if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=_audioCtx.createOscillator();
+    const g=_audioCtx.createGain();
+    o.connect(g);g.connect(_audioCtx.destination);
+    const vol={light:0.03,medium:0.06,heavy:0.1,success:0.05,error:0.08,tab:0.02};
+    g.gain.setValueAtTime(vol[type]||0.03,_audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,_audioCtx.currentTime+0.05);
+    o.frequency.setValueAtTime(type==='error'?80:type==='heavy'?100:200,_audioCtx.currentTime);
+    o.start(_audioCtx.currentTime);
+    o.stop(_audioCtx.currentTime+0.05);
+  }catch(e){}
 }
 
 // ══════════════════════════════════════════════════════════
@@ -766,13 +808,34 @@ window.addEventListener('DOMContentLoaded',()=>{
   showMain();initApp();
 });
 
+// ── Inactivity auto-lock (2 min) ──────────────────────────
+let inactivityTimer=null;
+const INACTIVITY_MS=2*60*1000; // 2 minutes
+
+function resetInactivityTimer(){
+  clearTimeout(inactivityTimer);
+  const lockEnabled=localStorage.getItem('lockEnabled')!=='false';
+  const pinSet=localStorage.getItem('pinHash');
+  if(!lockEnabled||!pinSet)return;
+  inactivityTimer=setTimeout(()=>{
+    if(document.getElementById('main-screen').style.display!=='none'){
+      showLock();
+    }
+  },INACTIVITY_MS);
+}
+
+// Track all user interactions
+['touchstart','touchend','click','keydown','scroll'].forEach(evt=>{
+  document.addEventListener(evt,resetInactivityTimer,{passive:true});
+});
+
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
     const lockEnabled=localStorage.getItem('lockEnabled')!=='false';
     const pinSet=localStorage.getItem('pinHash');
     if(lockEnabled&&pinSet){
       const last=parseInt(localStorage.getItem('lastUnlock')||'0');
-      if(Date.now()-last>30*60*1000) showLock();
+      if(Date.now()-last>INACTIVITY_MS) showLock();
     }
   }
 });
@@ -799,10 +862,22 @@ let lockPin='';
 function buildLockPad(){
   lockPin='';renderLockDots();
   const grid=document.getElementById('pin-grid');
-  const faceBtn=document.getElementById('faceid-btn');
-  const creds=window.PublicKeyCredential;
-  faceBtn.style.display=creds?'block':'none';
   grid.innerHTML=buildPinGrid('lockDigit','lockDel');
+  // Show Face ID view by default, hide PIN pad
+  const hasFaceID=window.PublicKeyCredential&&localStorage.getItem('credId');
+  if(hasFaceID){showFaceIDView();}
+  else{showPinPad();}
+}
+
+function showPinPad(){
+  document.getElementById('faceid-view').style.display='none';
+  document.getElementById('pinpad-view').style.display='flex';
+  lockPin='';renderLockDots();
+}
+
+function showFaceIDView(){
+  document.getElementById('pinpad-view').style.display='none';
+  document.getElementById('faceid-view').style.display='flex';
 }
 
 function buildPinGrid(digitFn,delFn){
@@ -886,7 +961,7 @@ async function triggerFaceID(){
       }
     });
     unlock();
-  }catch(e){/* user cancelled — show PIN */}
+  }catch(e){showPinPad();}
 }
 
 function unlock(){
@@ -895,6 +970,7 @@ function unlock(){
   S.pinAttempts=0;
   showMain();
   initApp();
+  resetInactivityTimer();
 }
 
 function shakeDots(id){
@@ -1217,7 +1293,9 @@ function renderHome(){
     </div>`;
 }
 
-function getCategoryTag(desc,amount,totalIncome){
+const CAT_COLORS={'Investment':'var(--blue)','EMI/Fixed':'var(--yellow)','Housing':'var(--green)','Personal':'var(--t2)','Transfer':'var(--blue)','Expense':'var(--t2)'};
+function getCategoryTag(desc,amount,totalIncome,storedCat){
+  if(storedCat&&CAT_COLORS[storedCat])return{tag:storedCat,color:CAT_COLORS[storedCat]};
   const d=desc.toLowerCase();
   if(d.includes('mutual fund')||d.includes('rd ')||d.includes('rd amount')||d.includes('gold')||d.includes('bees'))
     return {tag:'Investment',color:'var(--blue)'};
@@ -1237,7 +1315,7 @@ function simpleExpRow(e){
   const data=S.data[S.activeTab];
   const totalIncome=data?data.summary.totalIncome:0;
   const pct=totalIncome>0?((e.amount/totalIncome)*100).toFixed(1):0;
-  const cat=getCategoryTag(e.description,e.amount,totalIncome);
+  const cat=getCategoryTag(e.description,e.amount,totalIncome,e.category);
   return `<div style="display:flex;align-items:center;padding:13px 16px;gap:12px;border-bottom:0.5px solid var(--sep)">
     <div class="exp-dot ${paid?'paid':'unpaid'}"></div>
     <div style="flex:1;min-width:0">
@@ -1264,17 +1342,12 @@ function renderExpenses(){
       <div class="empty-sub">Tap + to add your first expense for ${S.activeTab}.</div>
     </div>`;return;
   }
+  // Flat list: Not Paid first, then Paid — no section headers
   const pending=expenses.filter(e=>e.status==='Not Paid');
   const paid=expenses.filter(e=>e.status==='Paid');
+  const ordered=[...pending,...paid];
   let html='<div style="padding:0 16px 8px">';
-  if(pending.length){
-    html+=`<div class="grp-label pending">Pending (${pending.length})</div>
-      <div class="exp-group">${pending.map(e=>swipeRowHTML(e)).join('')}</div>`;
-  }
-  if(paid.length){
-    html+=`<div class="grp-label paid-lbl">Paid (${paid.length})</div>
-      <div class="exp-group">${paid.map(e=>swipeRowHTML(e)).join('')}</div>`;
-  }
+  html+=`<div class="exp-group">${ordered.map(e=>swipeRowHTML(e)).join('')}</div>`;
   html+=`<div class="exp-page-total">Total: <span>${fmt(total)}</span></div></div>`;
   document.getElementById('exp-content').innerHTML=html;
   initSwipeRows();
@@ -1300,7 +1373,7 @@ function swipeRowHTML(e){
       <div class="exp-info">
         <div class="exp-name">${esc(e.description)}</div>
         <div style="display:flex;gap:5px;align-items:center;margin-top:2px;flex-wrap:wrap">
-          <span style="font-size:10px;font-weight:600;color:${getCategoryTag(e.description).color};background:${getCategoryTag(e.description).color}18;padding:1px 6px;border-radius:5px">${getCategoryTag(e.description).tag}</span>
+          <span style="font-size:10px;font-weight:600;color:${getCategoryTag(e.description,0,0,e.category).color};background:${getCategoryTag(e.description,0,0,e.category).color}18;padding:1px 6px;border-radius:5px">${getCategoryTag(e.description,0,0,e.category).tag}</span>
           <span style="font-size:11px;color:var(--t2)">${S.data[S.activeTab]&&S.data[S.activeTab].summary.totalIncome>0?((e.amount/S.data[S.activeTab].summary.totalIncome)*100).toFixed(1):0}% of income</span>
         </div>
       </div>
@@ -1362,11 +1435,11 @@ function initSwipeRows(){
         const prog=Math.min(Math.abs(dx)/120,1);
         const scale=0.7+0.3*prog;
         if(dx>0){
-          iconRight.style.transform=`scale(${scale})`;
-          iconLeft.style.transform='scale(0.7)';
-        } else {
           iconLeft.style.transform=`scale(${scale})`;
           iconRight.style.transform='scale(0.7)';
+        } else {
+          iconRight.style.transform=`scale(${scale})`;
+          iconLeft.style.transform='scale(0.7)';
         }
       });
     },{passive:true});
@@ -1446,6 +1519,7 @@ function openAddSheet(){
   document.getElementById('f-desc').value='';
   document.getElementById('f-amount').value='';
   document.getElementById('f-status').value='Not Paid';
+  document.getElementById('f-category').value='Expense';
   document.getElementById('form-delete-btn').style.display='none';
   openSheet('form-overlay');haptic('light');
 }
@@ -1456,6 +1530,7 @@ function openEditSheet(exp){
   document.getElementById('f-desc').value=exp.description;
   document.getElementById('f-amount').value=exp.amount;
   document.getElementById('f-status').value=exp.status;
+  document.getElementById('f-category').value=exp.category||'Expense';
   document.getElementById('form-delete-btn').style.display='block';
   openSheet('form-overlay');haptic('light');
 }
@@ -1464,6 +1539,7 @@ async function saveExpense(){
   const desc=document.getElementById('f-desc').value.trim();
   const amount=parseFloat(document.getElementById('f-amount').value)||0;
   const status=document.getElementById('f-status').value;
+  const category=document.getElementById('f-category').value;
   if(!desc){showToast('Enter a description');return;}
   closeSheet('form-overlay');
   const data=S.data[S.activeTab];
@@ -1472,13 +1548,13 @@ async function saveExpense(){
     // Optimistic update
     const exp=data.expenses.find(e=>e.rowIndex===S.editRow.rowIndex);
     const prev={...exp};
-    if(exp){exp.description=desc;exp.amount=amount;exp.status=status;}
+    if(exp){exp.description=desc;exp.amount=amount;exp.status=status;exp.category=category;}
     renderHome();renderExpenses();showToast('Expense updated');haptic('success');
     gasGet('updateRow',{tab:S.activeTab,rowIndex:S.editRow.rowIndex,description:desc,amount,status}).catch(()=>{
       if(exp)Object.assign(exp,prev);renderHome();renderExpenses();showToast('Sync failed');
     });
   } else {
-    const tmpRow={rowIndex:Date.now(),description:desc,amount,status};
+    const tmpRow={rowIndex:Date.now(),description:desc,amount,status,category};
     data.expenses.push(tmpRow);
     renderHome();renderExpenses();showToast('Expense added');haptic('success');
     gasGet('addRow',{tab:S.activeTab,description:desc,amount,status}).then(async()=>{
