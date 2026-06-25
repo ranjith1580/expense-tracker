@@ -737,12 +737,19 @@ body {
     <form class="setup-card" onsubmit="connectGAS(); return false;" style="width:100%;max-width:380px">
       <input id="gas-user-input" type="text"
         autocomplete="username" value="budget"
-        style="display:none" aria-hidden="true"/>
+        style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px"/>
       <div class="setup-label">GAS Web App URL</div>
-      <input id="gas-url-input" class="setup-input" type="password"
-        placeholder="Paste your GAS Web App URL"
-        autocomplete="current-password"
-        autocorrect="off" autocapitalize="none" spellcheck="false"/>
+      <div style="position:relative">
+        <input id="gas-url-input" class="setup-input" type="password"
+          placeholder="Paste your GAS Web App URL"
+          autocomplete="current-password"
+          autocorrect="off" autocapitalize="none" spellcheck="false"
+          style="padding-right:48px"/>
+        <button type="button" onclick="toggleUrlVisibility()" id="toggle-btn"
+          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);
+          background:none;border:none;color:var(--t2);cursor:pointer;
+          font-size:13px;font-weight:500;padding:4px">Show</button>
+      </div>
       <button type="submit" class="btn-primary" id="connect-btn" style="margin-top:12px">Connect & Test</button>
     </form>
     <div class="setup-error" id="setup-error"></div>
@@ -926,6 +933,18 @@ function showMain() {
 // ══════════════════════════════════════════════════════════
 // SETUP / CONNECT
 // ══════════════════════════════════════════════════════════
+function toggleUrlVisibility() {
+  const input = document.getElementById('gas-url-input');
+  const btn   = document.getElementById('toggle-btn');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+}
+
 async function connectGAS() {
   const url = document.getElementById('gas-url-input').value.trim();
   const err = document.getElementById('setup-error');
