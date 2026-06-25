@@ -257,10 +257,10 @@ body{
   align-items:center;pointer-events:none;
 }
 .swipe-reveal.right{
-  background:var(--green);justify-content:flex-start;padding-left:24px;
+  background:var(--red);justify-content:flex-end;padding-right:24px;
 }
 .swipe-reveal.left{
-  background:var(--red);justify-content:flex-end;padding-right:24px;
+  background:var(--green);justify-content:flex-start;padding-left:24px;
 }
 .swipe-reveal-icon{
   display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -949,6 +949,8 @@ async function handleSetupComplete(){
       const hash=await sha256(setupPin);
       localStorage.setItem('pinHash',hash);
       localStorage.setItem('lockEnabled','true');
+      // Register Face ID credential
+      await registerFaceID();
       haptic('success');
       showMain();initApp();
     } else {
@@ -959,6 +961,28 @@ async function handleSetupComplete(){
       setTimeout(()=>{updateSetupUI();document.getElementById('pin-setup-error').textContent='';},700);
     }
   }
+}
+
+async function registerFaceID(){
+  if(!window.PublicKeyCredential)return;
+  try{
+    const cred=await navigator.credentials.create({
+      publicKey:{
+        challenge:crypto.getRandomValues(new Uint8Array(32)),
+        rp:{name:'Personal Budget',id:location.hostname},
+        user:{id:new Uint8Array(16),name:'budget',displayName:'Personal Budget'},
+        pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+        authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+        timeout:60000
+      }
+    });
+    const credId=arrayBufferToBase64(cred.rawId);
+    localStorage.setItem('credId',credId);
+  }catch(e){/* biometrics not available */}
+}
+
+function arrayBufferToBase64(buf){
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
 async function sha256(str){
@@ -1036,8 +1060,26 @@ async function initApp(){
   }catch(e){}
   renderMonthStrip();
   const cur=currentMonthTab();
-  switchMonth(cur||S.tabs[0]||'');
+  await switchMonth(cur||S.tabs[0]||'');
   loadAllStats();loadRD();
+  // Preload adjacent months in background
+  preloadAdjacentMonths(cur||S.tabs[0]||'');
+}
+
+function preloadAdjacentMonths(currentTab){
+  const idx=S.tabs.indexOf(currentTab);
+  const toLoad=[];
+  if(idx>0)toLoad.push(S.tabs[idx-1]);
+  if(idx<S.tabs.length-1)toLoad.push(S.tabs[idx+1]);
+  toLoad.forEach(tab=>{
+    if(!S.data[tab]){
+      const cached=localStorage.getItem('cache_'+tab);
+      if(cached)S.data[tab]=JSON.parse(cached);
+      else setTimeout(()=>gasGet('getData',{tab}).then(res=>{
+        if(!res.error){S.data[tab]=res;localStorage.setItem('cache_'+tab,JSON.stringify(res));}
+      }),2000);
+    }
+  });
 }
 
 function currentMonthTab(){
@@ -1075,6 +1117,7 @@ async function switchMonth(tab){
   const el=document.getElementById('mt-'+sid(tab));
   if(el){el.classList.add('active');el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});}
   document.getElementById('header-title').textContent=tab+' Budget';
+  document.getElementById('header-sub').textContent='Personal Budget';
   if(S.data[tab]){renderHome();renderExpenses();}
   else await loadTabData(tab);
 }
@@ -1106,6 +1149,8 @@ async function syncNow(){
   await loadTabData(S.activeTab);
   loadAllStats();
   icon.classList.remove('spin');
+  document.getElementById('header-sub').textContent='Personal Budget';
+  if(S.currentPage==='settings')renderSettings();
   showToast('Synced');haptic('success');
 }
 
@@ -1172,13 +1217,35 @@ function renderHome(){
     </div>`;
 }
 
+function getCategoryTag(desc,amount,totalIncome){
+  const d=desc.toLowerCase();
+  if(d.includes('mutual fund')||d.includes('rd ')||d.includes('rd amount')||d.includes('gold')||d.includes('bees'))
+    return {tag:'Investment',color:'var(--blue)'};
+  if(d.includes('loan')||d.includes('emi')||d.includes('insurance')||d.includes('credit card')||d.includes('chit'))
+    return {tag:'EMI/Fixed',color:'var(--yellow)'};
+  if(d.includes('house')||d.includes('rent'))
+    return {tag:'Housing',color:'var(--green)'};
+  if(d.includes('personal')||d.includes('misc')||d.includes('misulin')||d.includes('other'))
+    return {tag:'Personal',color:'var(--t2)'};
+  if(d.includes('amma')||d.includes('priya')||d.includes('transfer')||d.includes('intrest'))
+    return {tag:'Transfer',color:'var(--blue)'};
+  return {tag:'Expense',color:'var(--t2)'};
+}
+
 function simpleExpRow(e){
   const paid=e.status==='Paid';
+  const data=S.data[S.activeTab];
+  const totalIncome=data?data.summary.totalIncome:0;
+  const pct=totalIncome>0?((e.amount/totalIncome)*100).toFixed(1):0;
+  const cat=getCategoryTag(e.description,e.amount,totalIncome);
   return `<div style="display:flex;align-items:center;padding:13px 16px;gap:12px;border-bottom:0.5px solid var(--sep)">
     <div class="exp-dot ${paid?'paid':'unpaid'}"></div>
     <div style="flex:1;min-width:0">
       <div class="exp-name">${esc(e.description)}</div>
-      <div class="exp-status">${e.status}</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
+        <span style="font-size:10px;font-weight:600;color:${cat.color};background:${cat.color}18;padding:1px 6px;border-radius:5px">${cat.tag}</span>
+        <span style="font-size:11px;color:var(--t2)">${pct}% of income</span>
+      </div>
     </div>
     <div class="exp-amt ${paid?'paid':'unpaid'}">${fmt(e.amount)}</div>
   </div>`;
@@ -1216,14 +1283,14 @@ function renderExpenses(){
 function swipeRowHTML(e){
   const paid=e.status==='Paid';
   return `<div class="exp-row-wrap" id="wrap-${e.rowIndex}" data-row="${e.rowIndex}" data-status="${e.status}">
-    <div class="swipe-reveal right" id="rev-right-${e.rowIndex}">
-      <div class="swipe-reveal-icon" id="icon-right-${e.rowIndex}">
+    <div class="swipe-reveal left" id="rev-left-${e.rowIndex}">
+      <div class="swipe-reveal-icon" id="icon-left-${e.rowIndex}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
         <span class="swipe-reveal-label">PAID</span>
       </div>
     </div>
-    <div class="swipe-reveal left" id="rev-left-${e.rowIndex}">
-      <div class="swipe-reveal-icon" id="icon-left-${e.rowIndex}">
+    <div class="swipe-reveal right" id="rev-right-${e.rowIndex}">
+      <div class="swipe-reveal-icon" id="icon-right-${e.rowIndex}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         <span class="swipe-reveal-label">UNPAID</span>
       </div>
@@ -1232,7 +1299,10 @@ function swipeRowHTML(e){
       <div class="exp-dot ${paid?'paid':'unpaid'}"></div>
       <div class="exp-info">
         <div class="exp-name">${esc(e.description)}</div>
-        <div class="exp-status">${e.status}</div>
+        <div style="display:flex;gap:5px;align-items:center;margin-top:2px;flex-wrap:wrap">
+          <span style="font-size:10px;font-weight:600;color:${getCategoryTag(e.description).color};background:${getCategoryTag(e.description).color}18;padding:1px 6px;border-radius:5px">${getCategoryTag(e.description).tag}</span>
+          <span style="font-size:11px;color:var(--t2)">${S.data[S.activeTab]&&S.data[S.activeTab].summary.totalIncome>0?((e.amount/S.data[S.activeTab].summary.totalIncome)*100).toFixed(1):0}% of income</span>
+        </div>
       </div>
       <div class="exp-amt ${paid?'paid':'unpaid'}">${fmt(e.amount)}</div>
     </div>
