@@ -972,13 +972,13 @@ async function gasGet(action, params = {}, url = null) {
   });
 }
 
+// All writes go via GET + JSONP to avoid CORS preflight
 async function gasPost(payload) {
-  const res = await fetch(S.gasUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
-  });
-  return res.json();
+  const params = {};
+  for (const [k, v] of Object.entries(payload)) {
+    params[k] = typeof v === 'object' ? JSON.stringify(v) : v;
+  }
+  return gasGet(payload.action, params);
 }
 
 // ══════════════════════════════════════════════════════════
