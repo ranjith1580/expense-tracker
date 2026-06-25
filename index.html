@@ -2,13 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Personal Budget"/>
+<meta name="apple-mobile-web-app-title" content="Budget"/>
+<meta name="application-name" content="Budget"/>
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"/>
 <meta name="theme-color" content="#000000"/>
+<meta name="msapplication-TileColor" content="#000000"/>
+<meta name="msapplication-tap-highlight" content="no"/>
+<meta name="format-detection" content="telephone=no"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png"/>
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png"/>
+<link rel="apple-touch-startup-image" href="icons/icon-512.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
 <title>Personal Budget</title>
 <style>
 /* ── Reset & Base ───────────────────────────────────────── */
@@ -726,9 +736,13 @@ body {
     <div class="setup-sub">Connect your Google Sheet to get started. Your data never leaves your device.</div>
     <div class="setup-card">
       <div class="setup-label">Google Apps Script URL</div>
-      <input id="gas-url-input" class="setup-input" type="url"
-        placeholder="https://script.google.com/macros/s/..."
-        autocomplete="url" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+      <input id="gas-url-input" class="setup-input" type="password"
+        placeholder="Paste your GAS Web App URL"
+        autocomplete="current-password"
+        autocorrect="off" autocapitalize="none" spellcheck="false"/>
+      <div style="font-size:12px;color:var(--t2);margin-top:8px">
+        Save your GAS URL as a password in iPhone Passwords app with username "budget" — iOS will autofill it here.
+      </div>
     </div>
     <button class="btn-primary" id="connect-btn" onclick="connectGAS()">Connect & Test</button>
     <div class="setup-error" id="setup-error"></div>
@@ -1678,6 +1692,14 @@ function errorState(msg) {
 
 // ── Close swipe on scroll ────────────────────────────────
 document.addEventListener('touchstart', () => closeSwipe(), { passive: true });
+
+// ── Register Service Worker ───────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .catch(err => console.log('SW error:', err));
+  });
+}
 </script>
 </body>
 </html>
