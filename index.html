@@ -947,8 +947,29 @@ async function connectGAS() {
 async function gasGet(action, params = {}, url = null) {
   const base = url || S.gasUrl;
   const q = new URLSearchParams({ action, ...params }).toString();
-  const res = await fetch(`${base}?${q}`);
-  return res.json();
+  return new Promise((resolve, reject) => {
+    const cb = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    window[cb] = (data) => {
+      delete window[cb];
+      try { document.body.removeChild(script); } catch(_) {}
+      resolve(data);
+    };
+    script.onerror = () => {
+      delete window[cb];
+      try { document.body.removeChild(script); } catch(_) {}
+      reject(new Error('Network error'));
+    };
+    script.src = base + '?' + q + '&callback=' + cb;
+    document.body.appendChild(script);
+    setTimeout(() => {
+      if (window[cb]) {
+        delete window[cb];
+        try { document.body.removeChild(script); } catch(_) {}
+        reject(new Error('Timeout'));
+      }
+    }, 15000);
+  });
 }
 
 async function gasPost(payload) {
