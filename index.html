@@ -734,23 +734,19 @@ body {
     </div>
     <div class="setup-title">Personal Budget</div>
     <div class="setup-sub">Connect your Google Sheet to get started. Your data never leaves your device.</div>
-    <div class="setup-card">
-      <div class="setup-label">Account</div>
-      <input id="gas-user-input" class="setup-input" type="text"
-        placeholder="budget"
-        autocomplete="username"
-        autocorrect="off" autocapitalize="none" spellcheck="false"
-        style="margin-bottom:10px"
-        value="budget"/>
-      <div class="setup-label" style="margin-top:4px">GAS URL (saved as Password)</div>
+    <form class="setup-card" onsubmit="connectGAS(); return false;" style="width:100%;max-width:380px">
+      <input id="gas-user-input" type="text"
+        autocomplete="username" value="budget"
+        style="display:none" aria-hidden="true"/>
+      <div class="setup-label">GAS Web App URL</div>
       <input id="gas-url-input" class="setup-input" type="password"
         placeholder="Paste your GAS Web App URL"
         autocomplete="current-password"
         autocorrect="off" autocapitalize="none" spellcheck="false"/>
-    </div>
-    <button class="btn-primary" id="connect-btn" onclick="connectGAS()">Connect & Test</button>
+      <button type="submit" class="btn-primary" id="connect-btn" style="margin-top:12px">Connect & Test</button>
+    </form>
     <div class="setup-error" id="setup-error"></div>
-    <div class="setup-hint">Paste the Web App URL from your Google Apps Script deployment. Save it in your Passwords app for easy access.</div>
+    <div class="setup-hint">In iPhone Passwords app, save your GAS URL as password with site: ranjith1580.github.io — iOS will autofill it here.</div>
   </div>
 
   <!-- ── Main Screen ───────────────────────────────────── -->
