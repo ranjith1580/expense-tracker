@@ -219,9 +219,10 @@ body{
 /* ── Cards ── */
 .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px 0}
 .summary-card{
-  background:var(--bg2);border-radius:14px;padding:14px;
+  background:var(--bg2);border-radius:14px;padding:16px;
   box-shadow:var(--card-shadow);transition:var(--trans);
   -webkit-tap-highlight-color:transparent;
+  overflow:hidden;
 }
 .summary-card.full{grid-column:1/-1}
 .card-label{font-size:12px;color:var(--t2);font-weight:500;margin-bottom:6px}
@@ -281,10 +282,9 @@ body{
 .exp-row{
   display:flex;align-items:center;padding:14px 16px;gap:12px;
   cursor:pointer;background:var(--bg2);position:relative;z-index:1;
-  will-change:transform;touch-action:pan-y;
-  transition:background 0.15s;
+  touch-action:pan-y;
 }
-.exp-row:active{background:var(--bg4);transform:scale(0.995)}
+.exp-row:active{background:var(--bg3)}
 .exp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .exp-dot.paid{background:var(--green)}.exp-dot.unpaid{background:var(--red)}
 .exp-info{flex:1;min-width:0}
@@ -406,14 +406,15 @@ body{
   color:var(--t2);font-family:var(--font);padding:0 4px;
   transition:color 0.2s;
 }
-.tab-item.active{color:var(--green)}
-.tab-item.active::before{
-  content:'';display:block;width:20px;height:3px;
-  background:var(--green);border-radius:0 0 2px 2px;
-  position:absolute;top:0;left:50%;transform:translateX(-50%);
-}
 .tab-item{position:relative;}
 .tab-item:active{opacity:0.6}
+.tab-item.active{color:var(--green)}
+.tab-item.active::before{
+  content:'';position:absolute;bottom:0;left:50%;
+  transform:translateX(-50%);
+  width:24px;height:3px;
+  background:var(--green);border-radius:2px 2px 0 0;
+}
 .tab-item svg{width:24px;height:24px}
 .tab-label{font-size:10px;font-weight:500;letter-spacing:0.1px}
 
@@ -749,26 +750,58 @@ body{
 // ══════════════════════════════════════════════════════════
 // HAPTIC
 // ══════════════════════════════════════════════════════════
-// Haptic — Android: vibrate API, iOS: AudioContext click + CSS bounce
+// Haptic — Android: vibrate, iOS: AudioContext + Taptic Engine trigger
 let _audioCtx=null;
-function haptic(type){
-  // Android vibrate
-  if(navigator.vibrate){
-    const p={light:[10],medium:[20],heavy:[30],success:[10,50,10],error:[50,30,50],tab:[5]};
-    navigator.vibrate(p[type]||[10]);
-  }
-  // iOS AudioContext haptic simulation
+let _audioReady=false;
+
+// Warm up AudioContext on first touch (iOS requires gesture)
+function warmupAudio(){
+  if(_audioReady)return;
   try{
-    if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    // Play silent buffer to unlock
+    const buf=_audioCtx.createBuffer(1,1,22050);
+    const src=_audioCtx.createBufferSource();
+    src.buffer=buf;src.connect(_audioCtx.destination);
+    src.start(0);
+    _audioCtx.resume().then(()=>{_audioReady=true;});
+  }catch(e){}
+}
+
+// Register warmup on first user touch
+document.addEventListener('touchstart',warmupAudio,{once:true,passive:true});
+document.addEventListener('click',warmupAudio,{once:true,passive:true});
+
+function haptic(type){
+  // Android + some iOS: vibrate API
+  if(navigator.vibrate){
+    const p={light:[8],medium:[15],heavy:[25],success:[8,40,8],error:[40,20,40],tab:[4]};
+    navigator.vibrate(p[type]||[8]);
+  }
+  // iOS Taptic Engine via AudioContext
+  if(!_audioCtx||!_audioReady)return;
+  try{
+    if(_audioCtx.state==='suspended')_audioCtx.resume();
     const o=_audioCtx.createOscillator();
     const g=_audioCtx.createGain();
     o.connect(g);g.connect(_audioCtx.destination);
-    const vol={light:0.03,medium:0.06,heavy:0.1,success:0.05,error:0.08,tab:0.02};
-    g.gain.setValueAtTime(vol[type]||0.03,_audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,_audioCtx.currentTime+0.05);
-    o.frequency.setValueAtTime(type==='error'?80:type==='heavy'?100:200,_audioCtx.currentTime);
-    o.start(_audioCtx.currentTime);
-    o.stop(_audioCtx.currentTime+0.05);
+    const now=_audioCtx.currentTime;
+    // Frequency + duration by type
+    const cfg={
+      light:  {f:1000,v:0.1, d:0.04},
+      medium: {f:800, v:0.18,d:0.06},
+      heavy:  {f:600, v:0.25,d:0.09},
+      success:{f:880, v:0.15,d:0.08},
+      error:  {f:200, v:0.3, d:0.12},
+      tab:    {f:1200,v:0.06,d:0.03},
+    };
+    const {f,v,d}=cfg[type]||cfg.light;
+    o.type='sine';
+    o.frequency.setValueAtTime(f,now);
+    g.gain.setValueAtTime(0,now);
+    g.gain.linearRampToValueAtTime(v,now+0.005);
+    g.gain.exponentialRampToValueAtTime(0.001,now+d);
+    o.start(now);o.stop(now+d+0.01);
   }catch(e){}
 }
 
@@ -1271,7 +1304,7 @@ function renderHome(){
 
   document.getElementById('home-content').innerHTML=`
     <div class="summary-grid">
-      <div class="summary-card" style="border-left:3px solid var(--green)">
+      <div class="summary-card">
         <div class="card-label">Total Income</div>
         <div class="card-value g">${fmt(summary.totalIncome)}</div>
         <div class="card-sub">${fmt(summary.ranjithSalary)} + ${fmt(summary.priyaSalary)}</div>
@@ -1282,7 +1315,7 @@ function renderHome(){
         <div class="card-sub">${spentPct}% of income</div>
         <div class="card-bar"><div class="card-bar-fill" style="width:${spentPct}%;background:var(--red)"></div></div>
       </div>
-      <div class="summary-card" style="border-left:3px solid ${summary.remaining>=0?'var(--green)':'var(--red)'}">
+      <div class="summary-card">
         <div class="card-label">Remaining ${stale}</div>
         <div class="card-value ${summary.remaining>=0?'g':'r'}">${fmt(summary.remaining)}</div>
         <div class="card-sub">Hold: ${fmt(summary.needToHold)}</div>
@@ -1435,7 +1468,12 @@ function initSwipeRows(){
       startY=e.touches[0].clientY;
       lastX=startX;lastT=Date.now();
       dx=0;axisLocked=false;isH=false;swiping=false;velocity=0;
+      // Kill ALL transitions on row to prevent jitter
       row.style.transition='none';
+      row.style.willChange='transform';
+      // Reset both reveals to z-index 0
+      revLeft.style.zIndex='0';
+      revRight.style.zIndex='0';
     },{passive:true});
 
     wrap.addEventListener('touchmove',e=>{
@@ -1492,6 +1530,7 @@ function initSwipeRows(){
         setTranslate(dir*window.innerWidth);
         setTimeout(()=>{
           row.style.transition='none';
+          row.style.willChange='auto';
           setTranslate(0);
           revLeft.style.zIndex='0';revRight.style.zIndex='0';
           iconRight.style.transform='scale(0.7)';
@@ -1500,6 +1539,7 @@ function initSwipeRows(){
           else optimisticMarkUnpaid(rowIndex);
         },280);
       } else {
+        row.style.willChange='auto';
         setTranslate(0);
         revLeft.style.zIndex='0';revRight.style.zIndex='0';
         iconRight.style.transform='scale(0.7)';
