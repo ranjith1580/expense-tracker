@@ -22,11 +22,11 @@
   --green:#34C759;--red:#FF3B30;--blue:#007AFF;--yellow:#FF9500;
   --green-dim:rgba(52,199,89,0.12);--red-dim:rgba(255,59,48,0.12);
   --blue-dim:rgba(0,122,255,0.12);--yellow-dim:rgba(255,149,0,0.12);
-  --card-shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
+  --card-shadow:0 1px 4px rgba(0,0,0,0.07),0 2px 8px rgba(0,0,0,0.04);
   --tab-h:56px;--safe-top:env(safe-area-inset-top,44px);
   --safe-bot:env(safe-area-inset-bottom,34px);
   --font:-apple-system,'SF Pro Display',BlinkMacSystemFont,system-ui,sans-serif;
-  --trans:background 0.3s ease,color 0.3s ease,border-color 0.3s ease;
+  --trans:background 0.3s ease,color 0.3s ease,border-color 0.3s ease,box-shadow 0.3s ease;
 }
 [data-theme="dark"]{
   --bg:#000000;--bg2:#1C1C1E;--bg3:#2C2C2E;--bg4:#3A3A3C;
@@ -169,7 +169,7 @@ body{
   justify-content:space-between;padding:10px 20px 12px;
 }
 .header-title{font-size:26px;font-weight:700;letter-spacing:-0.5px}
-.header-sub{font-size:13px;color:var(--t2);margin-top:1px}
+.header-sub{font-size:13px;color:var(--t1);opacity:0.5;margin-top:1px;font-weight:500}
 .header-right{display:flex;gap:8px;align-items:center}
 .icon-btn{
   width:34px;height:34px;background:var(--bg3);border-radius:50%;
@@ -186,7 +186,10 @@ body{
   display:flex;overflow-x:auto;padding:8px 16px;gap:8px;
   background:var(--bg);flex-shrink:0;
   border-bottom:0.5px solid var(--sep);transition:var(--trans);
+  -webkit-overflow-scrolling:touch;scroll-behavior:smooth;
+  scrollbar-width:none;-ms-overflow-style:none;
 }
+.month-strip::-webkit-scrollbar{display:none;}
 .month-tab{
   flex-shrink:0;padding:6px 14px;border-radius:20px;
   font-size:14px;font-weight:500;background:var(--bg2);
@@ -194,7 +197,7 @@ body{
   transition:all 0.2s;white-space:nowrap;position:relative;
   box-shadow:var(--card-shadow);
 }
-.month-tab.active{background:var(--green);color:#fff;font-weight:600}
+.month-tab.active{background:var(--green);color:#fff;font-weight:600;transform:scale(1.02)}
 [data-theme="light"] .month-tab.active{color:#fff}
 .mtab-dot{
   position:absolute;top:3px;right:3px;width:6px;height:6px;
@@ -218,6 +221,7 @@ body{
 .summary-card{
   background:var(--bg2);border-radius:14px;padding:14px;
   box-shadow:var(--card-shadow);transition:var(--trans);
+  -webkit-tap-highlight-color:transparent;
 }
 .summary-card.full{grid-column:1/-1}
 .card-label{font-size:12px;color:var(--t2);font-weight:500;margin-bottom:6px}
@@ -248,13 +252,15 @@ body{
   position:relative;overflow:hidden;
   border-bottom:0.5px solid var(--sep);
   will-change:transform;
+  -webkit-transform:translateZ(0);
+  isolation:isolate;
 }
 .exp-row-wrap:last-child{border-bottom:none}
 
 /* Action reveal layers */
 .swipe-reveal{
   position:absolute;inset:0;display:flex;
-  align-items:center;pointer-events:none;
+  align-items:center;pointer-events:none;z-index:0;
 }
 .swipe-reveal.right{
   background:var(--red);justify-content:flex-end;padding-right:24px;
@@ -264,7 +270,8 @@ body{
 }
 .swipe-reveal-icon{
   display:flex;flex-direction:column;align-items:center;gap:3px;
-  transform:scale(0.7);transition:transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  transform:scale(0.7);transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  will-change:transform;
 }
 .swipe-reveal-icon.show{transform:scale(1)}
 .swipe-reveal-icon svg{width:22px;height:22px;color:#fff}
@@ -277,7 +284,7 @@ body{
   will-change:transform;touch-action:pan-y;
   transition:background 0.15s;
 }
-.exp-row:active{background:var(--bg3)}
+.exp-row:active{background:var(--bg4);transform:scale(0.995)}
 .exp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .exp-dot.paid{background:var(--green)}.exp-dot.unpaid{background:var(--red)}
 .exp-info{flex:1;min-width:0}
@@ -293,9 +300,11 @@ body{
 }
 .grp-label.pending{color:var(--red)}.grp-label.paid-lbl{color:var(--green)}
 .exp-page-total{
-  text-align:right;padding:12px 20px;font-size:13px;color:var(--t2);
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 20px;font-size:13px;color:var(--t2);
+  border-top:0.5px solid var(--sep);margin:0 16px;
 }
-.exp-page-total span{color:var(--t1);font-weight:700}
+.exp-page-total span{color:var(--t1);font-weight:700;font-size:15px}
 
 /* ── Analytics ── */
 .analytics-wrap{padding:16px}
@@ -398,6 +407,12 @@ body{
   transition:color 0.2s;
 }
 .tab-item.active{color:var(--green)}
+.tab-item.active::before{
+  content:'';display:block;width:20px;height:3px;
+  background:var(--green);border-radius:0 0 2px 2px;
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+}
+.tab-item{position:relative;}
 .tab-item:active{opacity:0.6}
 .tab-item svg{width:24px;height:24px}
 .tab-label{font-size:10px;font-weight:500;letter-spacing:0.1px}
@@ -408,10 +423,10 @@ body{
   width:52px;height:52px;background:var(--green);border-radius:50%;
   border:none;display:flex;align-items:center;justify-content:center;
   cursor:pointer;z-index:20;
-  box-shadow:0 4px 20px rgba(52,199,89,0.4);
+  box-shadow:0 2px 12px rgba(52,199,89,0.25),0 4px 20px rgba(52,199,89,0.15);
   transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),opacity 0.25s;
 }
-[data-theme="dark"] .fab{box-shadow:0 4px 20px rgba(48,209,88,0.35)}
+[data-theme="dark"] .fab{box-shadow:0 4px 24px rgba(48,209,88,0.4)}
 .fab:active{transform:scale(0.9)!important}
 .fab svg{width:24px;height:24px;color:#fff}
 .fab.gone{transform:scale(0) translateY(20px);opacity:0;pointer-events:none}
@@ -429,8 +444,9 @@ body{
   border-radius:20px 20px 0 0;
   padding:0 20px calc(var(--safe-bot) + 20px);
   transform:translateY(100%);
-  transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);
+  transition:transform 0.38s cubic-bezier(0.32,0.72,0,1);
   max-height:90dvh;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 .sheet-overlay.open .sheet{transform:translateY(0)}
 .sheet-handle{width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:12px auto 18px}
@@ -445,8 +461,10 @@ body{
 .field-input::placeholder{color:var(--t3)}
 .field-select{
   width:100%;background:var(--bg3);border:none;border-radius:10px;
-  padding:13px 16px;font-size:17px;color:var(--t1);
+  padding:13px 44px 13px 16px;font-size:17px;color:var(--t1);
   font-family:var(--font);outline:none;margin-bottom:20px;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 16px center;
 }
 .sheet-actions{display:flex;gap:10px;margin-bottom:12px}
 .btn-cancel{
@@ -1233,6 +1251,15 @@ async function syncNow(){
 // ══════════════════════════════════════════════════════════
 // HOME
 // ══════════════════════════════════════════════════════════
+function animateCards(){
+  document.querySelectorAll('.summary-card').forEach((el,i)=>{
+    el.style.opacity='0';el.style.transform='translateY(8px)';
+    setTimeout(()=>{
+      el.style.transition='opacity 0.3s ease,transform 0.3s ease';
+      el.style.opacity='1';el.style.transform='translateY(0)';
+    },i*60);
+  });
+}
 function renderHome(){
   const data=S.data[S.activeTab];if(!data)return;
   const {summary,expenses,total}=data;
@@ -1244,7 +1271,7 @@ function renderHome(){
 
   document.getElementById('home-content').innerHTML=`
     <div class="summary-grid">
-      <div class="summary-card">
+      <div class="summary-card" style="border-left:3px solid var(--green)">
         <div class="card-label">Total Income</div>
         <div class="card-value g">${fmt(summary.totalIncome)}</div>
         <div class="card-sub">${fmt(summary.ranjithSalary)} + ${fmt(summary.priyaSalary)}</div>
@@ -1255,7 +1282,7 @@ function renderHome(){
         <div class="card-sub">${spentPct}% of income</div>
         <div class="card-bar"><div class="card-bar-fill" style="width:${spentPct}%;background:var(--red)"></div></div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card" style="border-left:3px solid ${summary.remaining>=0?'var(--green)':'var(--red)'}">
         <div class="card-label">Remaining ${stale}</div>
         <div class="card-value ${summary.remaining>=0?'g':'r'}">${fmt(summary.remaining)}</div>
         <div class="card-sub">Hold: ${fmt(summary.needToHold)}</div>
@@ -1291,6 +1318,7 @@ function renderHome(){
         <div class="card-sub">${expenses.filter(e=>e.status==='Not Paid').length} items</div>
       </div>
     </div>`;
+  setTimeout(animateCards,50);
 }
 
 const CAT_COLORS={'Investment':'var(--blue)','EMI/Fixed':'var(--yellow)','Housing':'var(--green)','Personal':'var(--t2)','Transfer':'var(--blue)','Expense':'var(--t2)'};
@@ -1321,7 +1349,7 @@ function simpleExpRow(e){
     <div style="flex:1;min-width:0">
       <div class="exp-name">${esc(e.description)}</div>
       <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
-        <span style="font-size:10px;font-weight:600;color:${cat.color};background:${cat.color}18;padding:1px 6px;border-radius:5px">${cat.tag}</span>
+        <span style="font-size:9px;font-weight:700;color:${cat.color};background:${cat.color}15;padding:2px 6px;border-radius:4px;letter-spacing:0.3px">${cat.tag}</span>
         <span style="font-size:11px;color:var(--t2)">${pct}% of income</span>
       </div>
     </div>
@@ -1359,13 +1387,13 @@ function swipeRowHTML(e){
     <div class="swipe-reveal left" id="rev-left-${e.rowIndex}">
       <div class="swipe-reveal-icon" id="icon-left-${e.rowIndex}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-        <span class="swipe-reveal-label">PAID</span>
+        <span class="swipe-reveal-label" style="font-size:10px;font-weight:800;letter-spacing:1px">PAID</span>
       </div>
     </div>
     <div class="swipe-reveal right" id="rev-right-${e.rowIndex}">
       <div class="swipe-reveal-icon" id="icon-right-${e.rowIndex}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        <span class="swipe-reveal-label">UNPAID</span>
+        <span class="swipe-reveal-label" style="font-size:10px;font-weight:800;letter-spacing:1px">UNPAID</span>
       </div>
     </div>
     <div class="exp-row" id="row-${e.rowIndex}" onclick="rowTapped(${e.rowIndex})">
@@ -1377,7 +1405,7 @@ function swipeRowHTML(e){
           <span style="font-size:11px;color:var(--t2)">${S.data[S.activeTab]&&S.data[S.activeTab].summary.totalIncome>0?((e.amount/S.data[S.activeTab].summary.totalIncome)*100).toFixed(1):0}% of income</span>
         </div>
       </div>
-      <div class="exp-amt ${paid?'paid':'unpaid'}">${fmt(e.amount)}</div>
+      <div class="exp-amt ${paid?'paid':'unpaid'}" style="text-align:right;min-width:72px">${fmt(e.amount)}</div>
     </div>
   </div>`;
 }
@@ -1431,13 +1459,16 @@ function initSwipeRows(){
       if(rafId)cancelAnimationFrame(rafId);
       rafId=requestAnimationFrame(()=>{
         setTranslate(dx);
-        // Scale icons
         const prog=Math.min(Math.abs(dx)/120,1);
         const scale=0.7+0.3*prog;
         if(dx>0){
+          // Right swipe → show LEFT (green/paid), hide RIGHT (red/unpaid)
+          revLeft.style.zIndex='1';revRight.style.zIndex='0';
           iconLeft.style.transform=`scale(${scale})`;
           iconRight.style.transform='scale(0.7)';
-        } else {
+        } else if(dx<0){
+          // Left swipe → show RIGHT (red/unpaid), hide LEFT (green/paid)
+          revRight.style.zIndex='1';revLeft.style.zIndex='0';
           iconRight.style.transform=`scale(${scale})`;
           iconLeft.style.transform='scale(0.7)';
         }
@@ -1462,6 +1493,7 @@ function initSwipeRows(){
         setTimeout(()=>{
           row.style.transition='none';
           setTranslate(0);
+          revLeft.style.zIndex='0';revRight.style.zIndex='0';
           iconRight.style.transform='scale(0.7)';
           iconLeft.style.transform='scale(0.7)';
           if(goRight)optimisticMarkPaid(rowIndex);
@@ -1469,6 +1501,7 @@ function initSwipeRows(){
         },280);
       } else {
         setTranslate(0);
+        revLeft.style.zIndex='0';revRight.style.zIndex='0';
         iconRight.style.transform='scale(0.7)';
         iconLeft.style.transform='scale(0.7)';
       }
@@ -1762,9 +1795,12 @@ function confirmDisconnect(){
 // ══════════════════════════════════════════════════════════
 function switchTab(page){
   S.currentPage=page;
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.style.opacity='1';});
   document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
+  const pg=document.getElementById('page-'+page);
+  pg.classList.add('active');
+  pg.style.opacity='0';
+  requestAnimationFrame(()=>{ pg.style.transition='opacity 0.2s ease'; pg.style.opacity='1'; });
   document.getElementById('tab-'+page).classList.add('active');
   document.getElementById('fab').classList.toggle('gone',page!=='expenses');
   haptic('tab');
